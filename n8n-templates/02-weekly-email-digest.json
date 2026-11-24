@@ -1,0 +1,178 @@
+{
+  "name": "Weekly AI tool changes digest by email (AI Leakage feed)",
+  "nodes": [
+    {
+      "id": "n1",
+      "name": "Every Monday",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtDay": [
+                1
+              ],
+              "triggerAtHour": 8
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "n2",
+      "name": "Your settings",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "tools",
+              "type": "string",
+              "value": ""
+            },
+            {
+              "id": "a2",
+              "name": "days",
+              "type": "number",
+              "value": 7
+            },
+            {
+              "id": "a3",
+              "name": "send_to",
+              "type": "string",
+              "value": "team@example.com"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "n3",
+      "name": "Get checked changes (AI Leakage feed)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        0
+      ],
+      "retryOnFail": true,
+      "parameters": {
+        "url": "https://aileakage.com/wp-json/ail/v1/changes",
+        "options": {}
+      }
+    },
+    {
+      "id": "n4",
+      "name": "Build the digest",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// One email listing the week's checked changes. Sends nothing in a week with no changes.\nconst s = $('Your settings').first().json;\nconst want = String(s.tools || '').split(',').map(t => t.trim().toLowerCase()).filter(Boolean);\nconst since = new Date(Date.now() - Number(s.days || 7) * 86400000).toISOString().slice(0, 10);\nconst esc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\nconst list = ($input.first().json.items || []).filter(c => c.date >= since\n  && (want.length === 0 || want.includes(c.tool) || want.includes(String(c.tool_name).toLowerCase())));\nif (list.length === 0) return [];\nconst rows = list.map(c => {\n  const link = c.our_page.replace('utm_source=ail_feed', 'utm_source=n8n').replace('utm_medium=json', 'utm_medium=template_digest');\n  return `<li><strong>${esc(c.tool_name)}</strong> (${esc(c.date)}): ${esc(c.summary)} <a href=\"${esc(link)}\">More</a></li>`;\n}).join('');\nconst html = `<p>${list.length} checked change(s) to AI tools' data terms since ${since}:</p><ul>${rows}</ul><p style=\"color:#666;font-size:12px\">Source: AI Leakage (aileakage.com), CC BY 4.0. General information, not legal advice.</p>`;\nreturn [{ json: { subject: `AI tool changes this week: ${list.length}`, html, send_to: s.send_to } }];\n"
+      }
+    },
+    {
+      "id": "n5",
+      "name": "Send the digest",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        880,
+        0
+      ],
+      "parameters": {
+        "fromEmail": "you@example.com",
+        "toEmail": "={{ $json.send_to }}",
+        "subject": "={{ $json.subject }}",
+        "emailFormat": "html",
+        "html": "={{ $json.html }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "s1",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        -300
+      ],
+      "parameters": {
+        "width": 620,
+        "height": 260,
+        "content": "## Weekly AI tool changes digest by email\nEvery Monday this reads the free AI Leakage changes feed and emails one short list of the week's checked changes to AI vendors' terms, privacy pages and pricing. Handy for a team, or for an IT provider sending clients a weekly note.\n\n**Set up (2 minutes)**\n1. In **Your settings**, set who it goes to, and optionally list tools (names or slugs, commas). Empty means every tool.\n2. In **Send the digest**, add your SMTP credential and your From address (or swap in a Gmail or Outlook node).\n3. Activate. A week with no changes sends nothing.\n\nFeed: CC BY 4.0, please keep the link back. General information, not legal advice.\n"
+      }
+    }
+  ],
+  "connections": {
+    "Every Monday": {
+      "main": [
+        [
+          {
+            "node": "Your settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Your settings": {
+      "main": [
+        [
+          {
+            "node": "Get checked changes (AI Leakage feed)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get checked changes (AI Leakage feed)": {
+      "main": [
+        [
+          {
+            "node": "Build the digest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build the digest": {
+      "main": [
+        [
+          {
+            "node": "Send the digest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

@@ -1,0 +1,173 @@
+{
+  "name": "Post AI tool terms changes to Slack (AI Leakage feed)",
+  "nodes": [
+    {
+      "id": "n1",
+      "name": "Every morning",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "triggerAtHour": 8
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "n2",
+      "name": "Your settings",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "tools",
+              "type": "string",
+              "value": "chatgpt, microsoft-copilot, slack-ai"
+            },
+            {
+              "id": "a2",
+              "name": "first_run_days",
+              "type": "number",
+              "value": 7
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "n3",
+      "name": "Get checked changes (AI Leakage feed)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        0
+      ],
+      "retryOnFail": true,
+      "parameters": {
+        "url": "https://aileakage.com/wp-json/ail/v1/changes",
+        "options": {}
+      }
+    },
+    {
+      "id": "n4",
+      "name": "Keep new changes to your tools",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Keeps only changes to the tools in 'Your settings' that this workflow has not posted before.\nconst s = $('Your settings').first().json;\nconst want = String(s.tools || '').split(',').map(t => t.trim().toLowerCase()).filter(Boolean);\nconst store = $getWorkflowStaticData('global');\nconst seen = new Set(store.seen || []);\nconst firstRun = !store.started;\nconst since = new Date(Date.now() - Number(s.first_run_days || 7) * 86400000).toISOString().slice(0, 10);\nconst all = $input.first().json.items || [];\nconst fresh = all.filter(c => !seen.has(c.id)\n  && (want.length === 0 || want.includes(c.tool) || want.includes(String(c.tool_name).toLowerCase()))\n  && (!firstRun || c.date >= since));\nfor (const c of all) seen.add(c.id);\nstore.seen = Array.from(seen).slice(-1000);\nstore.started = true;\nreturn fresh.reverse().map(c => {\n  const link = c.our_page.replace('utm_source=ail_feed', 'utm_source=n8n').replace('utm_medium=json', 'utm_medium=template_slack');\n  return { json: { ...c, text: `*${c.tool_name}* changed (${c.date}): ${c.summary}\\nMore: ${link}\\nSource: AI Leakage (aileakage.com), CC BY 4.0` } };\n});\n"
+      }
+    },
+    {
+      "id": "n5",
+      "name": "Post to Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        880,
+        0
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "#ai-tool-changes"
+        },
+        "text": "={{ $json.text }}",
+        "otherOptions": {}
+      }
+    },
+    {
+      "id": "s1",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        -300
+      ],
+      "parameters": {
+        "width": 620,
+        "height": 260,
+        "content": "## Post AI tool terms changes to Slack\nEach morning this reads the free AI Leakage changes feed (dated, checked changes to AI vendors' terms, privacy pages and pricing, each with a one-line summary) and posts the new ones for the tools your team uses.\n\n**Set up (2 minutes)**\n1. In **Your settings**, list your tools by name or slug, separated by commas. The full list is at https://aileakage.com/wp-json/ail/v1/tools . Leave it empty for every tool.\n2. In **Post to Slack**, add your Slack credential and pick a channel.\n3. Activate. The first run posts the last 7 days; after that only new changes.\n\nFeed: CC BY 4.0, please keep the link back. General information, not legal advice.\n"
+      }
+    }
+  ],
+  "connections": {
+    "Every morning": {
+      "main": [
+        [
+          {
+            "node": "Your settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Your settings": {
+      "main": [
+        [
+          {
+            "node": "Get checked changes (AI Leakage feed)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get checked changes (AI Leakage feed)": {
+      "main": [
+        [
+          {
+            "node": "Keep new changes to your tools",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Keep new changes to your tools": {
+      "main": [
+        [
+          {
+            "node": "Post to Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

@@ -1,0 +1,181 @@
+{
+  "name": "Keep an AI tool register up to date in Google Sheets (AI Leakage)",
+  "nodes": [
+    {
+      "id": "n1",
+      "name": "Every Monday",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtDay": [
+                1
+              ],
+              "triggerAtHour": 7
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "n2",
+      "name": "Read your tool register",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Tools"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "n3",
+      "name": "Get facts cards (AI Leakage)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        0
+      ],
+      "executeOnce": true,
+      "retryOnFail": true,
+      "parameters": {
+        "url": "https://aileakage.com/wp-json/ail/v1/tools",
+        "options": {}
+      }
+    },
+    {
+      "id": "n4",
+      "name": "Match each tool",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Matches each row's Tool to an AI Leakage facts card by name or slug and fills in the dated columns.\nconst cards = $input.first().json.tools || [];\nconst norm = t => String(t || '').toLowerCase().replace(/\\(.*?\\)/g, '').trim();\nconst find = name => {\n  const n = norm(name);\n  if (!n) return null;\n  return cards.find(c => c.tool === n || norm(c.name) === n)\n    || cards.find(c => norm(c.name).includes(n) || n.includes(norm(c.name)));\n};\nreturn $('Read your tool register').all().map(r => {\n  const row = r.json;\n  const c = find(row.Tool);\n  return { json: {\n    Tool: row.Tool,\n    'AI Leakage page': c ? c.our_page.replace('utm_source=ail_feed', 'utm_source=n8n').replace('utm_medium=json', 'utm_medium=template_register') : 'Not covered yet',\n    'Last re-read at source': c ? (c.last_reviewed || '') : '',\n    'Last checked change': c ? (c.last_change_date || 'None recorded') : '',\n    'Updated by workflow': new Date().toISOString().slice(0, 10)\n  } };\n});\n"
+      }
+    },
+    {
+      "id": "n5",
+      "name": "Update the register",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        880,
+        0
+      ],
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Tools"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [
+            "Tool"
+          ],
+          "schema": []
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "s1",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        -320
+      ],
+      "parameters": {
+        "width": 640,
+        "height": 280,
+        "content": "## Keep an AI tool register up to date in Google Sheets\nMany businesses keep a list of the AI tools their staff use. Every Monday this fills in, for each tool on your list, the address of its AI Leakage profile, when the profile was last re-read against the vendor's own documents, and the date of the last checked change.\n\n**Set up (3 minutes)**\n1. Make a Google Sheet with a tab called **Tools** and a column headed **Tool** (one tool per row, e.g. ChatGPT, Canva Magic Studio, Xero). Add empty columns: AI Leakage page, Last re-read at source, Last checked change, Updated by workflow.\n2. Paste the sheet's address into both Google Sheets nodes and add your Google credential.\n3. Activate. Tools we don't cover show 'Not covered yet'.\n\nData: AI Leakage, CC BY 4.0. No ratings or scores. General information, not legal advice.\n"
+      }
+    }
+  ],
+  "connections": {
+    "Every Monday": {
+      "main": [
+        [
+          {
+            "node": "Read your tool register",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read your tool register": {
+      "main": [
+        [
+          {
+            "node": "Get facts cards (AI Leakage)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get facts cards (AI Leakage)": {
+      "main": [
+        [
+          {
+            "node": "Match each tool",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Match each tool": {
+      "main": [
+        [
+          {
+            "node": "Update the register",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}
