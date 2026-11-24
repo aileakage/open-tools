@@ -9,8 +9,7 @@ Everything here is general information, not legal advice. There are no ratings o
 | Folder | What it does |
 |---|---|
 | [`n8n-templates/`](n8n-templates/) | Three n8n workflows: post AI tool terms changes to Slack, a weekly changes digest by email, and an AI tool register kept up to date in Google Sheets. |
-| [`mcp/`](mcp/) | How to connect an AI assistant to the read-only AI Leakage facts server (Model Context Protocol). |
-| [`msp-tenant-script/`](msp-tenant-script/) | A read-only PowerShell script for IT providers: which AI apps have been added to a Microsoft 365 tenant you manage. |
+| [`mcp/`](mcp/) | How to connect an AI assistant to the read-only AI Leakage facts server (Model Context Protocol). 
 
 ## The data
 
